@@ -2,6 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
 import authRoutes from './routes/authRoutes';
+import supabaseAuthRoutes from './routes/supabaseAuthRoutes';
 import userRoutes from './routes/userRoutes';
 import formulaRoutes from './routes/formulaRoutes';
 import chatRoutes from './routes/chatRoutes';
@@ -18,6 +19,7 @@ setupSwagger(app);
 
 // Routes
 app.use('/auth', authRoutes);
+app.use('/auth/supabase', supabaseAuthRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/formulas', formulaRoutes);
 app.use('/api/chat', chatRoutes);

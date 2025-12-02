@@ -9,6 +9,7 @@ import {
   getUsersWithFormulasCount,
   updateLastLogin
 } from '../controllers/userController';
+import { authenticateToken, requireAdmin, requireSupervisor } from '../middleware/authMiddleware';
 
 const router = Router();
 
@@ -78,7 +79,7 @@ const router = Router();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/', getAllUsers);
+router.get('/', authenticateToken, requireAdmin, getAllUsers);
 
 /**
  * @swagger
@@ -115,7 +116,7 @@ router.get('/', getAllUsers);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.get('/:id', getUserById);
+router.get('/:id', authenticateToken, requireAdmin, getUserById);
 
 /**
  * @swagger
@@ -151,7 +152,7 @@ router.get('/:id', getUserById);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.post('/', createUser);
+router.post('/', authenticateToken, requireAdmin, createUser);
 
 /**
  * @swagger
@@ -194,7 +195,7 @@ router.post('/', createUser);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.put('/:id', updateUser);
+router.put('/:id', authenticateToken, requireAdmin, updateUser);
 
 /**
  * @swagger
@@ -232,7 +233,7 @@ router.put('/:id', updateUser);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-router.delete('/:id', deleteUser);
+router.delete('/:id', authenticateToken, requireAdmin, deleteUser);
 
 // Additional user routes
 /**
@@ -254,7 +255,7 @@ router.delete('/:id', deleteUser);
  *       200:
  *         description: Users retrieved successfully
  */
-router.get('/role/:roleId', getUsersByRole);
+router.get('/role/:roleId', authenticateToken, requireAdmin, getUsersByRole);
 
 /**
  * @swagger
@@ -268,7 +269,7 @@ router.get('/role/:roleId', getUsersByRole);
  *       200:
  *         description: Users with formulas count retrieved successfully
  */
-router.get('/analytics/formulas-count', getUsersWithFormulasCount);
+router.get('/analytics/formulas-count', authenticateToken, requireAdmin, getUsersWithFormulasCount);
 
 /**
  * @swagger
@@ -289,6 +290,6 @@ router.get('/analytics/formulas-count', getUsersWithFormulasCount);
  *       200:
  *         description: Last login updated successfully
  */
-router.put('/:id/last-login', updateLastLogin);
+router.put('/:id/last-login', authenticateToken, updateLastLogin);
 
 export default router;
