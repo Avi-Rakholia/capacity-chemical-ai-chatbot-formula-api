@@ -1,6 +1,20 @@
 import { Request, Response, NextFunction } from 'express';
 import { supabase } from '../config/supabase';
 
+// Check if auth is disabled (for development/testing only)
+const AUTH_DISABLED = process.env.DISABLE_AUTH === 'true';
+
+// Mock user for when auth is disabled
+const MOCK_USER = {
+  id: 'dev-user-id',
+  email: 'dev@example.com',
+  role: process.env.MOCK_USER_ROLE || 'capacity', // Can be 'capacity', 'nsight', or 'user'
+  metadata: {
+    role: process.env.MOCK_USER_ROLE || 'capacity',
+    full_name: 'Development User'
+  }
+};
+
 // Extend Express Request type to include user
 declare global {
   namespace Express {
@@ -15,6 +29,12 @@ declare global {
   }
 }
 
+// Log auth status on startup
+if (AUTH_DISABLED) {
+  console.warn('⚠️  WARNING: Authentication is DISABLED! This should only be used in development.');
+  console.warn('⚠️  Mock user:', MOCK_USER);
+}
+
 /**
  * Middleware to verify Supabase JWT token
  */
@@ -23,6 +43,12 @@ export const authenticateToken = async (
   res: Response,
   next: NextFunction
 ) => {
+  // Bypass authentication if disabled
+  if (AUTH_DISABLED) {
+    req.user = MOCK_USER;
+    return next();
+  }
+
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
@@ -67,6 +93,12 @@ export const authenticateToken = async (
  */
 export const authorizeRole = (allowedRoles: string[]) => {
   return (req: Request, res: Response, next: NextFunction) => {
+    // Bypass authorization if auth is disabled
+    if (AUTH_DISABLED) {
+      req.user = req.user || MOCK_USER;
+      return next();
+    }
+
     if (!req.user) {
       return res.status(401).json({
         success: false,
@@ -74,6 +106,8 @@ export const authorizeRole = (allowedRoles: string[]) => {
       });
     }
 
+    console.log(req.user);
+    
     const userRole = req.user.role || 'user';
 
     if (!allowedRoles.includes(userRole)) {
@@ -91,12 +125,12 @@ export const authorizeRole = (allowedRoles: string[]) => {
 /**
  * Middleware to check if user is admin
  */
-export const requireAdmin = authorizeRole(['admin', 'Admin']);
+export const requireAdmin = authorizeRole(['admin', 'Admin','capacity']);
 
 /**
  * Middleware to check if user is supervisor or admin
  */
-export const requireSupervisor = authorizeRole(['admin', 'Admin', 'supervisor', 'Supervisor']);
+export const requireSupervisor = authorizeRole(['admin', 'Admin', 'supervisor', 'Supervisor','capacity']);
 
 /**
  * Optional authentication - doesn't fail if no token provided
@@ -106,6 +140,12 @@ export const optionalAuth = async (
   res: Response,
   next: NextFunction
 ) => {
+  // Use mock user if auth is disabled
+  if (AUTH_DISABLED) {
+    req.user = MOCK_USER;
+    return next();
+  }
+
   try {
     const authHeader = req.headers.authorization;
     const token = authHeader && authHeader.split(' ')[1];
