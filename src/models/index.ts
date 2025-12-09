@@ -14,6 +14,9 @@ export * from './Chat';
 // Approval models
 export * from './Approval';
 
+// Resource models
+export * from './Resource';
+
 // Session and logging models
 export * from './Session';
 

@@ -1,11 +1,14 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import path from 'path';
 import authRoutes from './routes/authRoutes';
 import supabaseAuthRoutes from './routes/supabaseAuthRoutes';
 import userRoutes from './routes/userRoutes';
 import formulaRoutes from './routes/formulaRoutes';
 import chatRoutes from './routes/chatRoutes';
+import approvalRoutes from './routes/approvalRoutes';
+import resourceRoutes from './routes/resourceRoutes';
 import { testConnection } from './db/db';
 import { setupSwagger } from './config/swagger';
 dotenv.config();
@@ -13,6 +16,9 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Setup Swagger documentation
 setupSwagger(app);
@@ -23,6 +29,8 @@ app.use('/auth/supabase', supabaseAuthRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/formulas', formulaRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/approvals', approvalRoutes);
+app.use('/api/resources', resourceRoutes);
 
 /**
  * @swagger

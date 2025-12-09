@@ -1,6 +1,6 @@
 export interface Approval {
   approval_id: number;
-  entity_type: 'Formula' | 'Quote';
+  entity_type: 'Formula' | 'Quote' | 'Resource';
   entity_id: number;
   approver_id: number;
   decision: 'Pending' | 'Approved' | 'Rejected' | 'Returned';
@@ -9,7 +9,7 @@ export interface Approval {
 }
 
 export interface CreateApprovalRequest {
-  entity_type: 'Formula' | 'Quote';
+  entity_type: 'Formula' | 'Quote' | 'Resource';
   entity_id: number;
   approver_id: number;
   decision?: 'Pending' | 'Approved' | 'Rejected' | 'Returned';
