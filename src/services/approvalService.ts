@@ -30,10 +30,10 @@ export class ApprovalService {
           WHEN a.entity_type = 'Quote' THEN q.created_on
           ELSE NULL
         END as request_date
-      FROM Approvals a
-      LEFT JOIN Users u ON a.approver_id = u.user_id
-      LEFT JOIN Formulas f ON a.entity_type = 'Formula' AND a.entity_id = f.formula_id
-      LEFT JOIN Quotes q ON a.entity_type = 'Quote' AND a.entity_id = q.quote_id
+      FROM approvals a
+      LEFT JOIN users u ON a.approver_id = u.user_id
+      LEFT JOIN formulas f ON a.entity_type = 'Formula' AND a.entity_id = f.formula_id
+      LEFT JOIN quotes q ON a.entity_type = 'Quote' AND a.entity_id = q.quote_id
       WHERE 1=1
     `;
 
@@ -73,10 +73,10 @@ export class ApprovalService {
           WHEN a.entity_type = 'Quote' THEN CONCAT('Quote for ', q.customer_name)
           ELSE NULL
         END as entity_name
-      FROM Approvals a
-      LEFT JOIN Users u ON a.approver_id = u.user_id
-      LEFT JOIN Formulas f ON a.entity_type = 'Formula' AND a.entity_id = f.formula_id
-      LEFT JOIN Quotes q ON a.entity_type = 'Quote' AND a.entity_id = q.quote_id
+      FROM approvals a
+      LEFT JOIN users u ON a.approver_id = u.user_id
+      LEFT JOIN formulas f ON a.entity_type = 'Formula' AND a.entity_id = f.formula_id
+      LEFT JOIN quotes q ON a.entity_type = 'Quote' AND a.entity_id = q.quote_id
       WHERE a.approval_id = ?
     `;
 
@@ -89,7 +89,7 @@ export class ApprovalService {
    */
   async createApproval(data: CreateApprovalRequest): Promise<Approval> {
     const query = `
-      INSERT INTO Approvals (entity_type, entity_id, approver_id, decision, comments)
+      INSERT INTO approvals (entity_type, entity_id, approver_id, decision, comments)
       VALUES (?, ?, ?, ?, ?)
     `;
 
@@ -113,7 +113,7 @@ export class ApprovalService {
     data: UpdateApprovalRequest
   ): Promise<Approval | null> {
     const query = `
-      UPDATE Approvals 
+      UPDATE approvals 
       SET decision = ?, comments = ?, decision_date = NOW()
       WHERE approval_id = ?
     `;
@@ -131,7 +131,7 @@ export class ApprovalService {
    * Delete an approval
    */
   async deleteApproval(approvalId: number): Promise<boolean> {
-    const query = 'DELETE FROM Approvals WHERE approval_id = ?';
+    const query = 'DELETE FROM approvals WHERE approval_id = ?';
     const [result] = await pool.query<ResultSetHeader>(query, [approvalId]);
     return result.affectedRows > 0;
   }
@@ -142,7 +142,7 @@ export class ApprovalService {
   async getPendingCount(): Promise<number> {
     const query = `
       SELECT COUNT(*) as count 
-      FROM Approvals 
+      FROM approvals 
       WHERE decision = 'Pending'
     `;
 

@@ -1,22 +1,27 @@
 export interface User {
   user_id: number;
-  name: string;
+  username: string;
   email: string;
+  password_hash?: string;
   role_id: number;
   last_login?: Date;
   status: 'Active' | 'Inactive';
+  created_on?: Date;
+  updated_on?: Date;
 }
 
 export interface CreateUserRequest {
-  name: string;
+  username: string;
   email: string;
+  password_hash?: string;
   role_id: number;
   status?: 'Active' | 'Inactive';
 }
 
 export interface UpdateUserRequest {
-  name?: string;
+  username?: string;
   email?: string;
+  password_hash?: string;
   role_id?: number;
   status?: 'Active' | 'Inactive';
 }

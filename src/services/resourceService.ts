@@ -20,8 +20,8 @@ export class ResourceService {
       SELECT 
         r.*,
         u.username as uploader_name
-      FROM Resources r
-      LEFT JOIN Users u ON r.uploaded_by = u.user_id
+      FROM resources r
+      LEFT JOIN users u ON r.uploaded_by = u.user_id
       WHERE 1=1
     `;
 
@@ -57,8 +57,8 @@ export class ResourceService {
       SELECT 
         r.*,
         u.username as uploader_name
-      FROM Resources r
-      LEFT JOIN Users u ON r.uploaded_by = u.user_id
+      FROM resources r
+      LEFT JOIN users u ON r.uploaded_by = u.user_id
       WHERE r.resource_id = ?
     `;
 
@@ -95,7 +95,7 @@ export class ResourceService {
     }
 
     const query = `
-      INSERT INTO Resources 
+      INSERT INTO resources 
       (file_name, file_type, file_size, file_url, category, uploaded_by, description, approval_status, approved_by, approved_on)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
@@ -147,7 +147,7 @@ export class ResourceService {
     }
 
     params.push(resourceId);
-    const query = `UPDATE Resources SET ${updates.join(', ')} WHERE resource_id = ?`;
+    const query = `UPDATE resources SET ${updates.join(', ')} WHERE resource_id = ?`;
 
     await pool.query(query, params);
     return this.getResourceById(resourceId);
@@ -157,7 +157,7 @@ export class ResourceService {
    * Delete a resource
    */
   async deleteResource(resourceId: number): Promise<boolean> {
-    const query = 'DELETE FROM Resources WHERE resource_id = ?';
+    const query = 'DELETE FROM resources WHERE resource_id = ?';
     const [result] = await pool.query<ResultSetHeader>(query, [resourceId]);
     return result.affectedRows > 0;
   }
@@ -169,10 +169,10 @@ export class ResourceService {
     total: number;
     byCategory: { category: string; count: number }[];
   }> {
-    const totalQuery = 'SELECT COUNT(*) as total FROM Resources';
+    const totalQuery = 'SELECT COUNT(*) as total FROM resources';
     const categoryQuery = `
       SELECT category, COUNT(*) as count 
-      FROM Resources 
+      FROM resources 
       GROUP BY category
     `;
 
@@ -190,7 +190,7 @@ export class ResourceService {
    */
   async approveResource(resourceId: number, approverId: number): Promise<Resource | null> {
     const query = `
-      UPDATE Resources 
+      UPDATE resources 
       SET approval_status = 'Approved',
           approved_by = ?,
           approved_on = NOW()
@@ -206,7 +206,7 @@ export class ResourceService {
    */
   async rejectResource(resourceId: number, approverId: number): Promise<Resource | null> {
     const query = `
-      UPDATE Resources 
+      UPDATE resources 
       SET approval_status = 'Rejected',
           approved_by = ?,
           approved_on = NOW()
@@ -225,8 +225,8 @@ export class ResourceService {
       SELECT 
         r.*,
         u.username as uploader_name
-      FROM Resources r
-      LEFT JOIN Users u ON r.uploaded_by = u.user_id
+      FROM resources r
+      LEFT JOIN users u ON r.uploaded_by = u.user_id
       WHERE r.approval_status = 'Pending'
       ORDER BY r.uploaded_on DESC
     `;

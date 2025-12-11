@@ -106,7 +106,6 @@ export const authorizeRole = (allowedRoles: string[]) => {
       });
     }
 
-    console.log(req.user);
     
     const userRole = req.user.role || 'user';
 

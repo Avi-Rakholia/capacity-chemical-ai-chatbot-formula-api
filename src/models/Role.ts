@@ -1,7 +1,8 @@
 export interface Role {
   role_id: number;
   role_name: 'Admin' | 'Supervisor' | 'Chemist' | 'Sales' | 'Worker';
-  permissions: any; // JSON field
+  permissions: any; // TEXT field in MySQL
+  created_on?: Date;
 }
 
 export interface CreateRoleRequest {

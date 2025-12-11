@@ -13,7 +13,19 @@ import {
 export class UserService {
   
   async getAllUsers(params: PaginationParams & { status?: string; role_id?: number }): Promise<PaginatedResponse<UserWithRole>> {
-    const { page = 1, limit = 10, sortBy = 'name', sortOrder = 'ASC', status, role_id } = params;
+    let { page = 1, limit = 10, sortBy = 'username', sortOrder = 'ASC', status, role_id } = params;
+    
+    // Map old field name to new field name for backwards compatibility
+    if (sortBy === 'name') {
+      sortBy = 'username';
+    }
+    
+    // Validate sortBy to prevent SQL injection
+    const validSortFields = ['username', 'email', 'status', 'last_login', 'created_on'];
+    if (!validSortFields.includes(sortBy)) {
+      sortBy = 'username';
+    }
+    
     const offset = (page - 1) * limit;
 
     let whereClause = '';
@@ -37,18 +49,19 @@ export class UserService {
     const total = countResult[0].total;
 
     // Get paginated data with role information
+    // Note: We use template literals for LIMIT/OFFSET as MySQL2 has issues with ? placeholders for these
     const query = `
       SELECT u.*, r.role_name, r.permissions 
       FROM users u 
       LEFT JOIN roles r ON u.role_id = r.role_id 
       ${whereClause}
       ORDER BY u.${sortBy} ${sortOrder}
-      LIMIT ? OFFSET ?
+      LIMIT ${Number(limit)} OFFSET ${Number(offset)}
     `;
     
     const [rows] = await pool.execute<RowDataPacket[]>(
       query,
-      [...queryParams, limit, offset]
+      queryParams
     );
 
     return {
@@ -100,11 +113,12 @@ export class UserService {
     }
 
     const [result] = await pool.execute<ResultSetHeader>(
-      `INSERT INTO users (name, email, role_id, status) 
-       VALUES (?, ?, ?, ?)`,
+      `INSERT INTO users (username, email, password_hash, role_id, status) 
+       VALUES (?, ?, ?, ?, ?)`,
       [
-        userData.name,
+        userData.username,
         userData.email,
+        hashedPassword,
         userData.role_id,
         userData.status || 'Active'
       ]
@@ -211,7 +225,7 @@ export class UserService {
        LEFT JOIN formulas f ON u.user_id = f.created_by
        WHERE u.status = 'Active'
        GROUP BY u.user_id
-       ORDER BY u.name`
+       ORDER BY u.username`
     );
 
     return rows as (UserWithRole & { formulas_count: number })[];

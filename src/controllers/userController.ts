@@ -11,7 +11,7 @@ export const getAllUsers = async (req: Request, res: Response): Promise<void> =>
     const params: PaginationParams & { status?: string; role_id?: number } = {
       page: page ? parseInt(page as string) : 1,
       limit: limit ? parseInt(limit as string) : 10,
-      sortBy: (sortBy as string) || 'name',
+      sortBy: (sortBy as string) || 'username',
       sortOrder: (sortOrder as 'ASC' | 'DESC') || 'ASC',
       status: status as string,
       role_id: role_id ? parseInt(role_id as string) : undefined
@@ -83,10 +83,10 @@ export const createUser = async (req: Request, res: Response): Promise<void> => 
     const userData = req.body;
 
     // Basic validation
-    if (!userData.name || !userData.email || !userData.role_id) {
+    if (!userData.username || !userData.email || !userData.role_id) {
       const response: ApiResponse<null> = {
         success: false,
-        error: 'Missing required fields: name, email, role_id'
+        error: 'Missing required fields: username, email, role_id'
       };
       res.status(400).json(response);
       return;

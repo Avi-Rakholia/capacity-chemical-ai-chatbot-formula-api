@@ -8,6 +8,7 @@ export interface Formula {
   container_cost: number;
   status: 'Draft' | 'Pending' | 'Approved' | 'Rejected';
   created_on: Date;
+  updated_on?: Date;
 }
 
 export interface CreateFormulaRequest {
@@ -35,7 +36,7 @@ export interface FormulaWithComponents extends Formula {
 }
 
 export interface FormulaComponent {
-  id: number;
+  component_id: number;
   formula_id: number;
   chemical_name: string;
   percentage: number;

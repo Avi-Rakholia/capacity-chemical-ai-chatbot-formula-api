@@ -32,6 +32,7 @@ export interface ActivityLog {
   record_id?: number;
   timestamp: Date;
   ip_address: string;
+  details?: string;
 }
 
 export interface CreateActivityLogRequest {

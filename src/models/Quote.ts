@@ -7,6 +7,7 @@ export interface Quote {
   status: 'Draft' | 'Pending_Approval' | 'Approved' | 'Rejected';
   template_id: number;
   created_on: Date;
+  updated_on?: Date;
 }
 
 export interface CreateQuoteRequest {
@@ -28,8 +29,9 @@ export interface UpdateQuoteRequest {
 export interface QuoteTemplate {
   template_id: number;
   template_name: string;
-  layout: any; // JSON field
+  layout: any; // TEXT field in MySQL
   is_default: boolean;
+  created_on?: Date;
 }
 
 export interface CreateQuoteTemplateRequest {

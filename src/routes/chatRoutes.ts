@@ -1,5 +1,13 @@
 import { Router } from 'express';
-// Import controllers when they are created
+import {
+  createSession,
+  getUserSessions,
+  getSessionById,
+  updateSession,
+  deleteSession,
+  streamChatMessage,
+  getChatTemplates
+} from '../controllers/chatController';
 
 const router = Router();
 
@@ -161,5 +169,14 @@ const router = Router();
  *                       response_time_ms: { type: integer }
  *                       created_on: { type: string, format: date-time }
  */
+
+// Route handlers
+router.get('/sessions', getUserSessions);
+router.post('/sessions', createSession);
+router.get('/sessions/:id', getSessionById);
+router.put('/sessions/:id', updateSession);
+router.delete('/sessions/:id', deleteSession);
+router.post('/stream', streamChatMessage);
+router.get('/templates', getChatTemplates);
 
 export default router;
