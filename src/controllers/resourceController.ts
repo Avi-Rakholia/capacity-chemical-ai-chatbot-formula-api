@@ -160,23 +160,50 @@ export const getResourceById = async (req: Request, res: Response) => {
  */
 export const createResource = async (req: Request, res: Response) => {
   try {
-    const data: CreateResourceRequest = req.body;
+      const data: CreateResourceRequest = req.body;
+      
+      
+
+    // Get user info from authenticated request
+    const uploadedBy = req.user?.user_id;
+    const userRole = req.user?.role_name;
+
+    if (!uploadedBy) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
+      });
+    }
 
     // Validation
     if (!data.file_name || !data.file_type || !data.file_size || 
-        !data.file_url || !data.category || !data.uploaded_by) {
+        !data.file_url || !data.category) {
       return res.status(400).json({
         success: false,
         error: 'All required fields must be provided'
       });
     }
 
-    const resource = await resourceService.createResource(data);
+    // Set uploaded_by from authenticated user
+    data.uploaded_by = uploadedBy;
+
+    // Pass user role to determine approval status
+    const resource = await resourceService.createResource(data, userRole);
+
+    // Determine appropriate message based on approval status
+    let message = 'Resource created successfully';
+    if (resource.approval_status === 'Pending') {
+      message = 'Resource created successfully and is pending approval';
+    } else if (resource.approval_status === 'Approved') {
+      message = 'Resource created and approved successfully';
+    }
+
+    console.log(`📝 Resource created by ${req.user?.email} (${userRole}): ${data.file_name} - Status: ${resource.approval_status}`);
 
     res.status(201).json({
       success: true,
       data: resource,
-      message: 'Resource created successfully'
+      message: message
     });
   } catch (error: any) {
     console.error('Error creating resource:', error);
@@ -393,12 +420,23 @@ export const uploadResource = async (req: Request, res: Response) => {
       });
     }
 
-    const { category, uploaded_by, description } = req.body;
+    const { category, description } = req.body;
 
-    if (!category || !uploaded_by) {
+    if (!category) {
       return res.status(400).json({
         success: false,
-        error: 'category and uploaded_by are required'
+        error: 'category is required'
+      });
+    }
+
+    // Get uploaded_by from authenticated user (req.user)
+    const uploadedBy = req.user?.user_id;
+    const userRole = req.user?.role_name;
+
+    if (!uploadedBy) {
+      return res.status(401).json({
+        success: false,
+        error: 'User not authenticated'
       });
     }
 
@@ -423,16 +461,27 @@ export const uploadResource = async (req: Request, res: Response) => {
       file_size: fileSize,
       file_url: fileUrl,
       category: category,
-      uploaded_by: parseInt(uploaded_by),
+      uploaded_by: uploadedBy,
       description: description || null
     };
 
-    const resource = await resourceService.createResource(resourceData);
+    // Pass user role to determine approval status
+    const resource = await resourceService.createResource(resourceData, userRole);
+
+    // Determine appropriate message based on approval status
+    let message = 'File uploaded successfully';
+    if (resource.approval_status === 'Pending') {
+      message = 'File uploaded successfully and is pending approval';
+    } else if (resource.approval_status === 'Approved') {
+      message = 'File uploaded and approved successfully';
+    }
+
+    console.log(`📤 Resource uploaded by ${req.user?.email} (${userRole}): ${file.originalname} - Status: ${resource.approval_status}`);
 
     res.status(201).json({
       success: true,
       data: resource,
-      message: 'File uploaded successfully'
+      message: message
     });
   } catch (error: any) {
     console.error('Error uploading file:', error);
@@ -544,16 +593,18 @@ export const downloadResource = async (req: Request, res: Response) => {
 export const approveResource = async (req: Request, res: Response) => {
   try {
     const resourceId = parseInt(req.params.id);
-    const { approver_id } = req.body;
+    
+    // Get approver from authenticated user (already verified as admin by middleware)
+    const approverId = req.user?.user_id;
 
-    if (!approver_id) {
-      return res.status(400).json({
+    if (!approverId) {
+      return res.status(401).json({
         success: false,
-        error: 'Approver ID is required'
+        error: 'User not authenticated'
       });
     }
 
-    const resource = await resourceService.approveResource(resourceId, approver_id);
+    const resource = await resourceService.approveResource(resourceId, approverId);
 
     if (!resource) {
       return res.status(404).json({
@@ -561,6 +612,8 @@ export const approveResource = async (req: Request, res: Response) => {
         error: 'Resource not found'
       });
     }
+
+    console.log(`✅ Resource approved by ${req.user?.email}: ${resource.file_name}`);
 
     res.json({
       success: true,
@@ -612,16 +665,18 @@ export const approveResource = async (req: Request, res: Response) => {
 export const rejectResource = async (req: Request, res: Response) => {
   try {
     const resourceId = parseInt(req.params.id);
-    const { approver_id } = req.body;
+    
+    // Get approver from authenticated user (already verified as admin by middleware)
+    const approverId = req.user?.user_id;
 
-    if (!approver_id) {
-      return res.status(400).json({
+    if (!approverId) {
+      return res.status(401).json({
         success: false,
-        error: 'Approver ID is required'
+        error: 'User not authenticated'
       });
     }
 
-    const resource = await resourceService.rejectResource(resourceId, approver_id);
+    const resource = await resourceService.rejectResource(resourceId, approverId);
 
     if (!resource) {
       return res.status(404).json({
@@ -629,6 +684,8 @@ export const rejectResource = async (req: Request, res: Response) => {
         error: 'Resource not found'
       });
     }
+
+    console.log(`❌ Resource rejected by ${req.user?.email}: ${resource.file_name}`);
 
     res.json({
       success: true,

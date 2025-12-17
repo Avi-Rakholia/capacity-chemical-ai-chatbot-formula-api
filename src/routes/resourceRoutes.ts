@@ -13,40 +13,41 @@ import {
   getPendingResources
 } from '../controllers/resourceController';
 import { upload } from '../config/upload';
+import { authenticateToken, requireAdmin } from '../middleware/authMiddleware';
 
 const router = Router();
 
-// POST upload new resource file
-router.post('/upload', upload.single('file'), uploadResource);
+// POST upload new resource file (requires authentication)
+router.post('/upload', authenticateToken, upload.single('file'), uploadResource);
 
-// GET download resource file
-router.get('/:id/download', downloadResource);
+// GET download resource file (requires authentication)
+router.get('/:id/download', authenticateToken, downloadResource);
 
-// POST approve resource
-router.post('/:id/approve', approveResource);
+// POST approve resource (requires admin)
+router.post('/:id/approve', authenticateToken, requireAdmin, approveResource);
 
-// POST reject resource
-router.post('/:id/reject', rejectResource);
+// POST reject resource (requires admin)
+router.post('/:id/reject', authenticateToken, requireAdmin, rejectResource);
 
-// GET all pending resources
-router.get('/pending', getPendingResources);
+// GET all pending resources (requires admin)
+router.get('/pending', authenticateToken, requireAdmin, getPendingResources);
 
-// GET all resources with optional filters
-router.get('/', getAllResources);
+// GET all resources with optional filters (requires authentication)
+router.get('/', authenticateToken, getAllResources);
 
-// GET resource statistics
-router.get('/stats', getResourceStats);
+// GET resource statistics (requires authentication)
+router.get('/stats', authenticateToken, getResourceStats);
 
-// GET resource by ID
-router.get('/:id', getResourceById);
+// GET resource by ID (requires authentication)
+router.get('/:id', authenticateToken, getResourceById);
 
-// POST create new resource (metadata only)
-router.post('/', createResource);
+// POST create new resource - metadata only (requires authentication)
+router.post('/', authenticateToken, createResource);
 
-// PUT update resource metadata
-router.put('/:id', updateResource);
+// PUT update resource metadata (requires authentication)
+router.put('/:id', authenticateToken, updateResource);
 
-// DELETE resource
-router.delete('/:id', deleteResource);
+// DELETE resource (requires authentication)
+router.delete('/:id', authenticateToken, deleteResource);
 
 export default router;

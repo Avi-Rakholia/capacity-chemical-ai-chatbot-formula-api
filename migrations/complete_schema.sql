@@ -28,7 +28,7 @@ DROP TABLE IF EXISTS roles;
 -- ============================================================
 CREATE TABLE roles (
     role_id INT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    role_name ENUM('Admin', 'Supervisor', 'Chemist', 'Sales', 'Worker') UNIQUE NOT NULL,
+    role_name ENUM('capacity_admin', 'nsight_admin', 'user') UNIQUE NOT NULL,
     permissions TEXT,
     created_on TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -319,35 +319,37 @@ BEGIN
 END//
 DELIMITER ;
 
+ALTER TABLE users 
+ADD COLUMN supabase_id VARCHAR(255) UNIQUE AFTER user_id,
+ADD INDEX idx_supabase_id (supabase_id);
+
 -- ============================================================
 -- SAMPLE DATA
 -- ============================================================
 
 -- Insert default roles
 INSERT INTO roles (role_name, permissions) VALUES
-('Admin', '{"all": true}'),
-('Supervisor', '{"formulas": ["read", "approve"], "quotes": ["read", "approve"], "users": ["read"]}'),
-('Chemist', '{"formulas": ["read", "create", "update"], "quotes": ["read"]}'),
-('Sales', '{"quotes": ["read", "create"], "formulas": ["read"]}'),
-('Worker', '{"formulas": ["read"], "quotes": ["read"]}');
+('capacity_admin', '{"all": true, "can_approve_resources": true, "can_manage_users": true, "can_view_all_data": true}'),
+('nsight_admin', '{"all": true, "can_approve_resources": true, "can_manage_users": true, "can_view_all_data": true}'),
+('user', '{"formulas": ["read", "create"], "quotes": ["read"], "chat": ["read", "create"]}');
 
 -- Insert default users
 INSERT INTO users (username, email, password_hash, role_id, status) VALUES
-('admin', 'admin@capacitychemical.com', '$2a$10$placeholder_hash_here', 1, 'Active'),
-('supervisor', 'supervisor@capacitychemical.com', '$2a$10$placeholder_hash_here', 2, 'Active'),
-('chemist1', 'chemist@capacitychemical.com', '$2a$10$placeholder_hash_here', 3, 'Active');
+('Capacity Admin', 'admin@capacitychemical.com', '$2a$10$placeholder_hash_here', 1, 'Active'),
+('Nsight Admin', 'admin@nsight.com', '$2a$10$placeholder_hash_here', 2, 'Active'),
+('User', 'user@capacitychemical.com', '$2a$10$placeholder_hash_here', 3, 'Active');
 
 -- Insert sample resources
-INSERT INTO resources (file_name, file_type, file_size, file_url, category, uploaded_by, description, approval_status, approved_by, approved_on) VALUES
-('Chemical Formulas Handbook', 'PDF Document', '24 MB', 'https://example.com/files/formulas-handbook.pdf', 'knowledge', 1, 'Comprehensive guide to chemical formulas', 'Approved', 1, NOW()),
-('Safety Datasheet', 'PDF Document', '3.2 MB', 'https://example.com/files/safety-datasheet.pdf', 'knowledge', 1, 'Safety protocols and guidelines', 'Approved', 1, NOW()),
-('Mixing Guide', 'PDF Document', '7.1 MB', 'https://example.com/files/mixing-guide.pdf', 'knowledge', 1, 'Step-by-step mixing procedures', 'Approved', 1, NOW()),
-('Supplier Quotes Q4', 'Excel Spreadsheet', '120 KB', 'https://example.com/files/quotes-q4.xlsx', 'quotes', 1, 'Q4 2024 supplier quotes', 'Pending', NULL, NULL),
-('Application Notes', 'PDF Document', '1.1 MB', 'https://example.com/files/app-notes.pdf', 'knowledge', 1, 'Product application guidelines', 'Approved', 1, NOW());
+-- INSERT INTO resources (file_name, file_type, file_size, file_url, category, uploaded_by, description, approval_status, approved_by, approved_on) VALUES
+-- ('Chemical Formulas Handbook', 'PDF Document', '24 MB', 'https://example.com/files/formulas-handbook.pdf', 'knowledge', 1, 'Comprehensive guide to chemical formulas', 'Approved', 1, NOW()),
+-- ('Safety Datasheet', 'PDF Document', '3.2 MB', 'https://example.com/files/safety-datasheet.pdf', 'knowledge', 1, 'Safety protocols and guidelines', 'Approved', 1, NOW()),
+-- ('Mixing Guide', 'PDF Document', '7.1 MB', 'https://example.com/files/mixing-guide.pdf', 'knowledge', 1, 'Step-by-step mixing procedures', 'Approved', 1, NOW()),
+-- ('Supplier Quotes Q4', 'Excel Spreadsheet', '120 KB', 'https://example.com/files/quotes-q4.xlsx', 'quotes', 1, 'Q4 2024 supplier quotes', 'Pending', NULL, NULL),
+-- ('Application Notes', 'PDF Document', '1.1 MB', 'https://example.com/files/app-notes.pdf', 'knowledge', 1, 'Product application guidelines', 'Approved', 1, NOW());
 
 -- Insert default quote template
-INSERT INTO quote_templates (template_name, layout, is_default) VALUES
-('Standard Quote Template', '{"header": "Capacity Chemical", "footer": "Terms & Conditions"}', TRUE);
+-- INSERT INTO quote_templates (template_name, layout, is_default) VALUES
+-- ('Standard Quote Template', '{"header": "Capacity Chemical", "footer": "Terms & Conditions"}', TRUE);
 
 -- ============================================================
 -- END OF SCHEMA

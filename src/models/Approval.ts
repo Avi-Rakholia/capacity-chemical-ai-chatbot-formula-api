@@ -24,4 +24,7 @@ export interface UpdateApprovalRequest {
 export interface ApprovalWithDetails extends Approval {
   approver_name?: string;
   entity_name?: string;
+  resource_category?: string;
+  requester_name?: string;
+  request_date?: Date;
 }

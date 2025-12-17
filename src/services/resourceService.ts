@@ -10,6 +10,7 @@ import {
 export class ResourceService {
   /**
    * Get all resources with optional filtering
+   * Only returns approved resources (pending resources shown only in approval screen)
    */
   async getAllResources(filters?: {
     category?: 'formulas' | 'quotes' | 'knowledge' | 'other';
@@ -22,7 +23,7 @@ export class ResourceService {
         u.username as uploader_name
       FROM resources r
       LEFT JOIN users u ON r.uploaded_by = u.user_id
-      WHERE 1=1
+      WHERE r.approval_status = 'Approved'
     `;
 
     const params: any[] = [];
@@ -68,28 +69,29 @@ export class ResourceService {
 
   /**
    * Create a new resource with approval logic
+   * - Admin uploads: auto-approved
    * - Knowledge base: auto-approved
-   * - Other categories: pending approval (unless user has permission)
+   * - Regular user formulas/quotes: pending approval (creates approval record)
    */
   async createResource(data: CreateResourceRequest, userRole?: string): Promise<Resource> {
-    // Determine approval status based on category and user role
+    // Determine approval status based on user role
     let approvalStatus: 'Approved' | 'Pending' = 'Pending';
     let approvedBy: number | null = null;
     let approvedOn: Date | null = null;
 
-    // Knowledge base resources are auto-approved
-    if (data.category === 'knowledge') {
-      approvalStatus = 'Approved';
-      approvedBy = data.uploaded_by;
-      approvedOn = new Date();
-    }
     // Admin users can auto-approve their own uploads
-    else if (userRole === 'Admin') {
+    if (userRole === 'capacity_admin' || userRole === 'nsight_admin') {
       approvalStatus = 'Approved';
       approvedBy = data.uploaded_by;
       approvedOn = new Date();
     }
-    // All other resources require approval
+    // Knowledge base resources are also auto-approved
+    else if (data.category === 'knowledge') {
+      approvalStatus = 'Approved';
+      approvedBy = data.uploaded_by;
+      approvedOn = new Date();
+    }
+    // Regular users need approval for formulas and quotes
     else {
       approvalStatus = 'Pending';
     }
@@ -113,7 +115,25 @@ export class ResourceService {
       approvedOn
     ]);
 
-    const resource = await this.getResourceById(result.insertId);
+    const resourceId = result.insertId;
+
+    // If approval is pending, create an approval record in the approvals table
+    if (approvalStatus === 'Pending') {
+      const approvalQuery = `
+        INSERT INTO approvals (entity_type, entity_id, approver_id, decision, comments)
+        VALUES ('Resource', ?, ?, 'Pending', ?)
+      `;
+      
+      // Use the uploader's ID as placeholder for approver_id (will be updated when admin actually approves)
+      // This satisfies the foreign key constraint while keeping the record in pending state
+      await pool.query(approvalQuery, [
+        resourceId,
+        data.uploaded_by, // Use uploader ID to satisfy foreign key - will be updated when admin approves/rejects
+        `Resource upload pending approval: ${data.file_name}`
+      ]);
+    }
+
+    const resource = await this.getResourceById(resourceId);
     return resource as Resource;
   }
 
@@ -189,6 +209,7 @@ export class ResourceService {
    * Approve a resource
    */
   async approveResource(resourceId: number, approverId: number): Promise<Resource | null> {
+    // Update resource approval status
     const query = `
       UPDATE resources 
       SET approval_status = 'Approved',
@@ -197,7 +218,21 @@ export class ResourceService {
       WHERE resource_id = ?
     `;
 
-    await pool.query(query, [approverId, resourceId]);
+    const [result] = await pool.query<ResultSetHeader>(query, [approverId, resourceId]);
+    console.log(`✅ Resource ${resourceId} approval status updated. Rows affected: ${result.affectedRows}`);
+
+    // Update the approvals table
+    const approvalQuery = `
+      UPDATE approvals 
+      SET decision = 'Approved',
+          approver_id = ?,
+          decision_date = NOW()
+      WHERE entity_type = 'Resource' AND entity_id = ? AND decision = 'Pending'
+    `;
+
+    const [approvalResult] = await pool.query<ResultSetHeader>(approvalQuery, [approverId, resourceId]);
+    console.log(`✅ Approvals table updated for resource ${resourceId}. Rows affected: ${approvalResult.affectedRows}`);
+
     return this.getResourceById(resourceId);
   }
 
@@ -205,6 +240,7 @@ export class ResourceService {
    * Reject a resource
    */
   async rejectResource(resourceId: number, approverId: number): Promise<Resource | null> {
+    // Update resource approval status
     const query = `
       UPDATE resources 
       SET approval_status = 'Rejected',
@@ -213,7 +249,21 @@ export class ResourceService {
       WHERE resource_id = ?
     `;
 
-    await pool.query(query, [approverId, resourceId]);
+    const [result] = await pool.query<ResultSetHeader>(query, [approverId, resourceId]);
+    console.log(`❌ Resource ${resourceId} rejection status updated. Rows affected: ${result.affectedRows}`);
+
+    // Update the approvals table
+    const approvalQuery = `
+      UPDATE approvals 
+      SET decision = 'Rejected',
+          approver_id = ?,
+          decision_date = NOW()
+      WHERE entity_type = 'Resource' AND entity_id = ? AND decision = 'Pending'
+    `;
+
+    const [approvalResult] = await pool.query<ResultSetHeader>(approvalQuery, [approverId, resourceId]);
+    console.log(`❌ Approvals table updated for resource ${resourceId}. Rows affected: ${approvalResult.affectedRows}`);
+
     return this.getResourceById(resourceId);
   }
 

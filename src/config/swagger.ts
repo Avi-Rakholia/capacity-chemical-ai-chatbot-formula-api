@@ -48,7 +48,7 @@ const options = {
             {
               type: 'object',
               properties: {
-                role_name: { type: 'string', example: 'Admin' },
+                role_name: { type: 'string', example: 'capacity_admin' },
                 permissions: { type: 'object', description: 'JSON object containing permissions' }
               }
             }
@@ -68,7 +68,7 @@ const options = {
           type: 'object',
           properties: {
             role_id: { type: 'integer', example: 1 },
-            role_name: { type: 'string', enum: ['Admin', 'Supervisor', 'Chemist', 'Sales', 'Worker'] },
+            role_name: { type: 'string', enum: ['capacity_admin', 'nsight_admin', 'user'] },
             permissions: { type: 'object', description: 'JSON object containing permissions' }
           }
         },
@@ -140,9 +140,9 @@ const options = {
               type: 'object',
               properties: {
                 user_id: { type: 'integer', example: 1 },
-                name: { type: 'string', example: 'Admin User' },
-                email: { type: 'string', example: 'admin@example.com' },
-                role_name: { type: 'string', example: 'Admin' },
+                name: { type: 'string', example: 'Capacity Admin User' },
+                email: { type: 'string', example: 'admin@capacitychemical.com' },
+                role_name: { type: 'string', example: 'capacity_admin' },
                 permissions: { type: 'object' }
               }
             }

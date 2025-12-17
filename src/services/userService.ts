@@ -1,6 +1,7 @@
 import { RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import bcrypt from 'bcryptjs';
 import { pool } from '../db/db';
+import { supabase } from '../config/supabase';
 import { 
   User, 
   UserWithRole,
@@ -100,37 +101,105 @@ export class UserService {
   }
 
   async createUser(userData: CreateUserRequest & { password?: string }): Promise<User> {
-    // Check if email already exists
+    // Check if email already exists in MySQL
     const existingUser = await this.getUserByEmail(userData.email);
     if (existingUser) {
       throw new Error('Email already exists');
     }
 
-    // Hash password if provided
+    // Get role name for Supabase metadata
+    const [roleRows] = await pool.execute<RowDataPacket[]>(
+      'SELECT role_name FROM roles WHERE role_id = ?',
+      [userData.role_id]
+    );
+    const roleName = roleRows.length > 0 ? roleRows[0].role_name : 'user';
+
+    // 1. Create user in Supabase first (with auto-confirmation)
+    let supabaseUserId: string | null = null;
+    
+    try {
+      const password = userData.password || this.generateRandomPassword();
+      
+      const { data: supabaseUser, error: supabaseError } = await supabase.auth.admin.createUser({
+        email: userData.email,
+        password: password,
+        email_confirm: true, // ⭐ AUTO-CONFIRM EMAIL
+        user_metadata: {
+          name: userData.username,
+          role: roleName,
+          display_name: userData.username
+        }
+      });
+
+      if (supabaseError) {
+        console.error('Supabase user creation error:', supabaseError);
+        throw new Error(`Failed to create Supabase user: ${supabaseError.message}`);
+      }
+
+      if (!supabaseUser?.user) {
+        throw new Error('Failed to create Supabase user: No user data returned');
+      }
+
+      supabaseUserId = supabaseUser.user.id;
+      console.log('✅ Created and auto-confirmed Supabase user:', supabaseUser.user.email);
+      
+    } catch (supabaseErr) {
+      console.error('Error creating Supabase user:', supabaseErr);
+      throw new Error(`Failed to create user in authentication system: ${supabaseErr instanceof Error ? supabaseErr.message : 'Unknown error'}`);
+    }
+
+    // 2. Create user in MySQL
     let hashedPassword = null;
     if (userData.password) {
       hashedPassword = await bcrypt.hash(userData.password, 10);
     }
 
-    const [result] = await pool.execute<ResultSetHeader>(
-      `INSERT INTO users (username, email, password_hash, role_id, status) 
-       VALUES (?, ?, ?, ?, ?)`,
-      [
-        userData.username,
-        userData.email,
-        hashedPassword,
-        userData.role_id,
-        userData.status || 'Active'
-      ]
-    );
+    try {
+      const [result] = await pool.execute<ResultSetHeader>(
+        `INSERT INTO users (username, email, password_hash, role_id, status, created_on) 
+         VALUES (?, ?, ?, ?, ?, NOW())`,
+        [
+          userData.username,
+          userData.email,
+          hashedPassword,
+          userData.role_id,
+          userData.status || 'Active'
+        ]
+      );
 
-    const userId = result.insertId;
+      const userId = result.insertId;
+      console.log('✅ Created MySQL user:', userId, userData.email);
 
-    // If password was provided, you might want to store it in a separate auth table
-    // For now, we'll just return the created user
-    
-    const createdUser = await this.getUserById(userId);
-    return createdUser as User;
+      const createdUser = await this.getUserById(userId);
+      return createdUser as User;
+      
+    } catch (mysqlErr) {
+      // Rollback: Delete Supabase user if MySQL creation fails
+      if (supabaseUserId) {
+        console.warn('⚠️ MySQL user creation failed, cleaning up Supabase user...');
+        try {
+          await supabase.auth.admin.deleteUser(supabaseUserId);
+          console.log('✅ Cleaned up Supabase user');
+        } catch (cleanupErr) {
+          console.error('❌ Failed to cleanup Supabase user:', cleanupErr);
+        }
+      }
+      
+      throw mysqlErr;
+    }
+  }
+
+  /**
+   * Generate a random secure password
+   */
+  private generateRandomPassword(): string {
+    const length = 16;
+    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+    let password = '';
+    for (let i = 0; i < length; i++) {
+      password += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    return password;
   }
 
   async updateUser(id: number, updateData: UpdateUserRequest): Promise<User | null> {

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { supabase } from '../config/supabase';
 import { pool } from '../db/db';
+import { syncSupabaseUserWithMySQL, getUserByEmail } from '../services/userSyncService';
 
 /**
  * Register a new user with Supabase Auth
@@ -13,6 +14,15 @@ export const registerWithSupabase = async (req: Request, res: Response) => {
       return res.status(400).json({
         success: false,
         error: 'Email, password, and name are required'
+      });
+    }
+
+    // Check if user already exists in MySQL
+    const existingUser = await getUserByEmail(email);
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        error: 'Email already exists'
       });
     }
 
@@ -36,29 +46,24 @@ export const registerWithSupabase = async (req: Request, res: Response) => {
       });
     }
 
-    // Optionally sync user to MySQL database
+    // Sync user to MySQL database
+    let userData = null;
     if (data.user) {
       try {
-        // Get role_id from role name (default to 3 for regular user)
-        let role_id = 3; // Default role
-        if (role) {
-          const [roles]: any = await pool.query(
-            'SELECT role_id FROM roles WHERE role_name = ?',
-            [role]
-          );
-          if (roles.length > 0) {
-            role_id = roles[0].role_id;
-          }
+        userData = await syncSupabaseUserWithMySQL(data.user);
+        
+        if (!userData) {
+          return res.status(500).json({
+            success: false,
+            error: 'Failed to sync user to database'
+          });
         }
-
-        // Insert user into MySQL database
-        await pool.query(
-          'INSERT INTO users (user_id, name, email, role_id, status, created_at) VALUES (?, ?, ?, ?, ?, NOW()) ON DUPLICATE KEY UPDATE name = ?, email = ?, role_id = ?',
-          [data.user.id, name, email, role_id, 'Active', name, email, role_id]
-        );
       } catch (dbError) {
         console.error('Error syncing user to database:', dbError);
-        // Continue even if database sync fails
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to sync user to database'
+        });
       }
     }
 
@@ -66,7 +71,8 @@ export const registerWithSupabase = async (req: Request, res: Response) => {
       success: true,
       data: {
         user: data.user,
-        session: data.session
+        session: data.session,
+        userData: userData // Complete user data from MySQL for UI
       },
       message: 'User registered successfully'
     });
@@ -106,16 +112,10 @@ export const loginWithSupabase = async (req: Request, res: Response) => {
       });
     }
 
-    // Update last_login in MySQL database
+    // Sync user with MySQL database and get user data
+    let userData = null;
     if (data.user) {
-      try {
-        await pool.query(
-          'UPDATE users SET last_login = NOW() WHERE user_id = ? OR email = ?',
-          [data.user.id, email]
-        );
-      } catch (dbError) {
-        console.error('Error updating last login:', dbError);
-      }
+      userData = await syncSupabaseUserWithMySQL(data.user);
     }
 
     res.json({
@@ -123,7 +123,8 @@ export const loginWithSupabase = async (req: Request, res: Response) => {
       data: {
         user: data.user,
         session: data.session,
-        access_token: data.session.access_token
+        access_token: data.session.access_token,
+        userData: userData // Complete user data from MySQL for UI
       },
       message: 'Login successful'
     });
@@ -187,22 +188,8 @@ export const getCurrentUser = async (req: Request, res: Response) => {
       });
     }
 
-    // Get additional user data from MySQL database
-    let userData = null;
-    try {
-      const [users]: any = await pool.query(
-        `SELECT u.*, r.role_name, r.permissions 
-         FROM users u 
-         LEFT JOIN roles r ON u.role_id = r.role_id 
-         WHERE u.user_id = ? OR u.email = ?`,
-        [user.id, user.email]
-      );
-      if (users.length > 0) {
-        userData = users[0];
-      }
-    } catch (dbError) {
-      console.error('Error fetching user data:', dbError);
-    }
+    // Sync user with MySQL database and get user data
+    const userData = await syncSupabaseUserWithMySQL(user);
 
     res.json({
       success: true,
@@ -210,6 +197,7 @@ export const getCurrentUser = async (req: Request, res: Response) => {
         id: user.id,
         email: user.email,
         metadata: user.user_metadata,
+        role: user.user_metadata?.role || user.role,
         userData: userData
       }
     });

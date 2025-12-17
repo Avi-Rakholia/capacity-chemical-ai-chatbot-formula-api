@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { supabase } from '../config/supabase';
+import { ensureUserSynced } from '../services/userSyncService';
 
 // Check if auth is disabled (for development/testing only)
 const AUTH_DISABLED = process.env.DISABLE_AUTH === 'true';
@@ -24,6 +25,13 @@ declare global {
         email: string;
         role?: string;
         metadata?: any;
+        // MySQL user data
+        user_id?: number;
+        username?: string;
+        role_id?: number;
+        role_name?: string;
+        permissions?: any;
+        status?: string;
       };
     }
   }
@@ -70,13 +78,38 @@ export const authenticateToken = async (
       });
     }
 
-    // Attach user to request
+    // Sync user with MySQL and get user data
+    const mysqlUserData = await ensureUserSynced(user);
+
+    if (!mysqlUserData) {
+      console.error('❌ Failed to sync user with MySQL:', user.email);
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to synchronize user data'
+      });
+    }
+
+    // Attach user to request with MySQL data
     req.user = {
       id: user.id,
       email: user.email || '',
       role: user.user_metadata?.role,
-      metadata: user.user_metadata
+      metadata: user.user_metadata,
+      // MySQL data
+      user_id: mysqlUserData.user_id,
+      username: mysqlUserData.username,
+      role_id: mysqlUserData.role_id,
+      role_name: mysqlUserData.role_name,
+      permissions: mysqlUserData.permissions,
+      status: mysqlUserData.status
     };
+
+    console.log('🔐 Authenticated user:', {
+      email: req.user.email,
+      supabase_role: req.user.role,
+      mysql_role_name: req.user.role_name,
+      user_id: req.user.user_id
+    });
 
     next();
   } catch (error) {
@@ -106,30 +139,47 @@ export const authorizeRole = (allowedRoles: string[]) => {
       });
     }
 
+    // Use MySQL role_name (primary) or fall back to Supabase role
+    const userRole = req.user.role_name || req.user.role || 'user';
     
-    const userRole = req.user.role || 'user';
+    console.log('🔒 Checking authorization:', {
+      user_email: req.user.email,
+      user_role: userRole,
+      allowed_roles: allowedRoles,
+      has_access: allowedRoles.includes(userRole)
+    });
 
-    if (!allowedRoles.includes(userRole)) {
+    // Normalize role names (handle underscores and spaces)
+    const normalizedUserRole = userRole.toLowerCase().replace(/\s+/g, '_');
+    const normalizedAllowedRoles = allowedRoles.map(r => r.toLowerCase().replace(/\s+/g, '_'));
+
+    if (!normalizedAllowedRoles.includes(normalizedUserRole)) {
+      console.warn('❌ Access denied:', {
+        user_role: userRole,
+        required_roles: allowedRoles
+      });
+      
       return res.status(403).json({
         success: false,
         error: 'Insufficient permissions',
-        message: `Required roles: ${allowedRoles.join(', ')}`
+        message: `Required roles: ${allowedRoles.join(', ')}, your role: ${userRole}`
       });
     }
 
+    console.log('✅ Access granted');
     next();
   };
 };
 
 /**
- * Middleware to check if user is admin
+ * Middleware to check if user is admin (capacity_admin or nsight_admin)
  */
-export const requireAdmin = authorizeRole(['admin', 'Admin','capacity']);
+export const requireAdmin = authorizeRole(['capacity_admin', 'nsight_admin', 'capacity admin', 'nsight admin']);
 
 /**
- * Middleware to check if user is supervisor or admin
+ * Middleware to check if user is supervisor or admin (same as admin for the 3-role system)
  */
-export const requireSupervisor = authorizeRole(['admin', 'Admin', 'supervisor', 'Supervisor','capacity']);
+export const requireSupervisor = authorizeRole(['capacity_admin', 'nsight_admin', 'capacity admin', 'nsight admin']);
 
 /**
  * Optional authentication - doesn't fail if no token provided
@@ -152,12 +202,24 @@ export const optionalAuth = async (
     if (token) {
       const { data: { user } } = await supabase.auth.getUser(token);
       if (user) {
-        req.user = {
-          id: user.id,
-          email: user.email || '',
-          role: user.user_metadata?.role,
-          metadata: user.user_metadata
-        };
+        // Sync user with MySQL and get user data
+        const mysqlUserData = await ensureUserSynced(user);
+        
+        if (mysqlUserData) {
+          req.user = {
+            id: user.id,
+            email: user.email || '',
+            role: user.user_metadata?.role,
+            metadata: user.user_metadata,
+            // MySQL data
+            user_id: mysqlUserData.user_id,
+            username: mysqlUserData.username,
+            role_id: mysqlUserData.role_id,
+            role_name: mysqlUserData.role_name,
+            permissions: mysqlUserData.permissions,
+            status: mysqlUserData.status
+          };
+        }
       }
     }
 
