@@ -258,66 +258,95 @@ export class ChatService extends EventEmitter {
     sessionId?: number
   ): AsyncGenerator<string, void, unknown> {
     try {
-      // Prepare request payload
-      const payload: any = {
-        prompt: prompt,
-        stream: true
-      };
+      // Determine which endpoint to use based on the query content
+      const isGenerationQuery = this.isGenerationQuery(prompt);
+      const endpoint = isGenerationQuery 
+        ? '/generateformula/generateformula'
+        : '/fetchformula/fetchformula';
 
-      // Add attachment references
-      if (attachments && attachments.length > 0) {
-        payload.attachments = attachments.map(att => ({
-          type: att.type,
-          resource_id: att.resource_id,
-          file_url: att.file_url,
-          file_name: att.file_name
-        }));
+      // Prepare request payload based on endpoint
+      let payload: any;
+      
+      if (isGenerationQuery) {
+        // For generation endpoint
+        payload = {
+          message: prompt,
+          conversation_id: sessionId ? sessionId.toString() : undefined
+        };
+      } else {
+        // For fetch endpoint  
+        payload = {
+          message: prompt,
+          conversation_id: sessionId ? sessionId.toString() : 'default'
+        };
       }
 
-      if (sessionId) {
-        payload.session_id = sessionId;
-      }
+      console.log(`Using endpoint: ${endpoint}`);
+      console.log('Sending payload to Python service:', JSON.stringify(payload, null, 2));
 
-      // Call Python AI service with streaming
+      // Call Python AI service - since main.py doesn't have streaming, we'll simulate it
       const response = await axios.post(
-        `${this.pythonServiceUrl}/api/chat/stream`,
+        `${this.pythonServiceUrl}${endpoint}`,
         payload,
         {
-          responseType: 'stream',
           headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'text/event-stream'
+            'Content-Type': 'application/json'
           }
         }
       );
 
-      // Process the stream
-      for await (const chunk of response.data) {
-        const chunkStr = chunk.toString();
-        
-        // Parse SSE format
-        const lines = chunkStr.split('\n');
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6); // Remove 'data: ' prefix
-            if (data.trim() && data !== '[DONE]') {
-              try {
-                const parsed = JSON.parse(data);
-                if (parsed.chunk) {
-                  yield parsed.chunk;
-                }
-              } catch {
-                // If not JSON, yield as-is
-                yield data;
-              }
-            }
-          }
-        }
+      // Simulate streaming by chunking the response
+      const responseText = isGenerationQuery 
+        ? response.data.message || response.data.response || 'No response'
+        : response.data.response || response.data.message || 'No response';
+
+      // Split response into words and yield each word as a chunk
+      const words = responseText.split(' ');
+      for (let i = 0; i < words.length; i++) {
+        const chunk = words[i] + (i < words.length - 1 ? ' ' : '');
+        yield chunk;
+        // Small delay to simulate streaming
+        await new Promise(resolve => setTimeout(resolve, 50));
       }
+      
     } catch (error: any) {
-      console.error('Error streaming from Python service:', error.message);
-      throw new Error('Failed to stream AI response: ' + error.message);
+      console.error('Error calling Python service:', error.response?.data || error.message);
+      throw new Error('Failed to get AI response: ' + (error.response?.data?.detail || error.message));
     }
+  }
+
+  /**
+   * Determine if the query is asking for formula generation vs fetching existing formulas
+   */
+  private isGenerationQuery(prompt: string): boolean {
+    const generationKeywords = [
+      'generate', 'create', 'make', 'develop', 'design', 'formulate',
+      'new formula', 'custom formula', 'build', 'construct'
+    ];
+    
+    const fetchKeywords = [
+      'find', 'search', 'get', 'fetch', 'lookup', 'show me', 'what is',
+      'details', 'information', 'components', 'ingredients'
+    ];
+    
+    const lowerPrompt = prompt.toLowerCase();
+    
+    // Check for generation keywords
+    const hasGenerationKeywords = generationKeywords.some(keyword => 
+      lowerPrompt.includes(keyword)
+    );
+    
+    // Check for fetch keywords
+    const hasFetchKeywords = fetchKeywords.some(keyword => 
+      lowerPrompt.includes(keyword)
+    );
+    
+    // If both or neither, default to fetch (safer for existing data)
+    if (hasGenerationKeywords && !hasFetchKeywords) {
+      return true;
+    }
+    
+    return false;
   }
 
   /**
