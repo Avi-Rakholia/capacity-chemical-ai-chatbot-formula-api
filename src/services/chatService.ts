@@ -175,7 +175,7 @@ export class ChatService extends EventEmitter {
     for (const att of attachments) {
       await pool.query(query, [
         interactionId,
-        att.type,
+        att.attachment_type,
         att.file_name || null,
         att.file_url || null,
         att.resource_id || null,
