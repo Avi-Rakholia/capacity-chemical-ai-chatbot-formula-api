@@ -8,6 +8,7 @@ export interface ChatSession {
   linked_formula_id?: number;
   summary?: string;
   metadata?: any; // JSON field
+  conversation_id?: string; // Python AI service conversation ID for context continuity
 }
 
 export interface CreateChatSessionRequest {
@@ -26,6 +27,7 @@ export interface UpdateChatSessionRequest {
   linked_formula_id?: number;
   summary?: string;
   metadata?: any;
+  conversation_id?: string;
 }
 
 export interface ChatInteraction {

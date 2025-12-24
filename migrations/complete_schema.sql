@@ -179,12 +179,14 @@ CREATE TABLE chat_sessions (
     linked_formula_id INT UNSIGNED NULL,
     summary TEXT,
     metadata TEXT,
+    conversation_id VARCHAR(255) NULL,
     
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
     FOREIGN KEY (linked_formula_id) REFERENCES formulas(formula_id) ON DELETE SET NULL,
     INDEX idx_user_id (user_id),
     INDEX idx_status (status),
-    INDEX idx_start_time (start_time)
+    INDEX idx_start_time (start_time),
+    INDEX idx_conversation_id (conversation_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================

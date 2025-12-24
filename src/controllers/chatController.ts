@@ -201,6 +201,7 @@ export const streamChatMessage = async (req: Request, res: Response) => {
     });
 
     let fullResponse = '';
+    let conversationId: string | undefined;
 
     try {
       // Stream from AI service
@@ -216,11 +217,16 @@ export const streamChatMessage = async (req: Request, res: Response) => {
         })}\n\n`);
       }
 
-      // Send completion event
+      // Get the conversation_id from the session after AI response
+      const session = await chatService.getSessionById(session_id);
+      conversationId = session?.conversation_id;
+
+      // Send completion event with conversation_id
       res.write(`data: ${JSON.stringify({ 
         done: true, 
         interaction_id: interaction.interaction_id,
-        full_response: fullResponse
+        full_response: fullResponse,
+        conversation_id: conversationId
       })}\n\n`);
 
       // Update interaction with full response
