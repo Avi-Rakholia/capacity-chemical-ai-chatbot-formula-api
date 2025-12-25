@@ -258,7 +258,8 @@ export class ChatService extends EventEmitter {
    */
   async callPythonAIService(
     prompt: string,
-    sessionId?: number
+    sessionId?: number,
+    mode?: string
   ): Promise<{ message: string; conversation_id?: string }> {
     try {
       // First, try to get existing conversation_id if this is an existing session
@@ -267,20 +268,33 @@ export class ChatService extends EventEmitter {
         existingConversationId = await this.getConversationId(sessionId);
       }
 
-      // Determine which endpoint to use based on the query content
-      const isGenerationQuery = this.isGenerationQuery(prompt);
-      const endpoint = isGenerationQuery 
-        ? '/generateformula/generateformula'
-        : '/fetchformula/fetchformula';
+      // Determine which endpoint to use based on the explicit mode (from UI) or query content
+      let endpoint: string;
+      if (mode) {
+        const m = mode.toLowerCase();
+        if (m === 'create') endpoint = '/generateformula/generateformula';
+        else if (m === 'search') endpoint = '/fetchformula/fetchformula';
+        else if (m === 'quote') endpoint = '/generatequote/generatequote';
+        else endpoint = '/fetchformula/fetchformula';
+      } else {
+        const isGenerationQuery = this.isGenerationQuery(prompt);
+        endpoint = isGenerationQuery ? '/generateformula/generateformula' : '/fetchformula/fetchformula';
+      }
 
-      // Prepare request payload with existing or new conversation_id
+      // Prepare request payload with conversation_id only if it exists
+      // First message: no conversation_id, Python service will return one
+      // Subsequent messages: include the stored conversation_id
       const payload: any = {
-        message: prompt,
-        conversation_id: existingConversationId || (sessionId ? sessionId.toString() : undefined)
+        message: prompt
       };
+      
+      if (existingConversationId) {
+        payload.conversation_id = existingConversationId;
+      }
 
       console.log(`Using endpoint: ${endpoint}`);
       console.log('Sending payload to Python service:', JSON.stringify(payload, null, 2));
+      console.log(`Conversation ID: ${existingConversationId ? 'sending stored ID: ' + existingConversationId : 'first message - no ID'}`);
 
       // Call Python AI service
       const response = await axios.post(
@@ -294,15 +308,22 @@ export class ChatService extends EventEmitter {
       );
 
       // Extract response message
-      const responseText = isGenerationQuery 
-        ? response.data.message || response.data.response || 'No response'
-        : response.data.response || response.data.message || 'No response';
+      let responseText: string;
+      const modeLower = (mode || '').toLowerCase();
+      if (modeLower === 'create' || modeLower === 'quote') {
+        responseText = response.data.message || response.data.response || 'No response';
+      } else if (modeLower === 'search') {
+        responseText = response.data.response || response.data.message || 'No response';
+      } else {
+        responseText = response.data.response || response.data.message || response.data.message || 'No response';
+      }
 
       // Extract conversation_id from response (if provided by Python service)
       const conversationId = response.data.conversation_id;
 
-      // Store conversation_id if we have a session and received a new one
-      if (sessionId && conversationId && !existingConversationId) {
+      // Store conversation_id if we have a session and received one from Python service
+      // This ensures we capture the conversation_id on the first message response
+      if (sessionId && conversationId) {
         await this.storeConversationId(sessionId, conversationId);
         console.log(`Stored conversation_id for session ${sessionId}:`, conversationId);
       }
@@ -324,11 +345,12 @@ export class ChatService extends EventEmitter {
   async *streamAIResponse(
     prompt: string,
     attachments?: any[],
-    sessionId?: number
+    sessionId?: number,
+    mode?: string
   ): AsyncGenerator<string, void, unknown> {
     try {
       // Call Python service to get response and conversation_id
-      const result = await this.callPythonAIService(prompt, sessionId);
+      const result = await this.callPythonAIService(prompt, sessionId, mode);
       const responseText = result.message;
 
       // Split response into words and yield each word as a chunk

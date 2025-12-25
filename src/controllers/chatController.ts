@@ -168,7 +168,7 @@ export const deleteSession = async (req: Request, res: Response) => {
  */
 export const streamChatMessage = async (req: Request, res: Response) => {
   try {
-    const { session_id, message, attachments } = req.body;
+    const { session_id, message, attachments, mode } = req.body;
     const userId = (req as any).user?.id || req.body.user_id;
 
     if (!userId) {
@@ -205,7 +205,7 @@ export const streamChatMessage = async (req: Request, res: Response) => {
 
     try {
       // Stream from AI service
-      const stream = chatService.streamAIResponse(message, attachments, session_id);
+      const stream = chatService.streamAIResponse(message, attachments, session_id, mode);
 
       for await (const chunk of stream) {
         fullResponse += chunk;
