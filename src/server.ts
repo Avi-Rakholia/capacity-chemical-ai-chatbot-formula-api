@@ -9,6 +9,7 @@ import formulaRoutes from './routes/formulaRoutes';
 import chatRoutes from './routes/chatRoutes';
 import approvalRoutes from './routes/approvalRoutes';
 import resourceRoutes from './routes/resourceRoutes';
+import analyticsRoutes from './routes/analyticsRoutes';
 import { testConnection } from './db/db';
 import { setupSwagger } from './config/swagger';
 dotenv.config();
@@ -69,6 +70,7 @@ app.use('/api/formulas', formulaRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/approvals', approvalRoutes);
 app.use('/api/resources', resourceRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 /**
  * @swagger
